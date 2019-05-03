@@ -3,11 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from src.utils import accuracy
-from src.batch_norm import Batch_norm_2d
-
-# TODO implement up_conv
-
 class U_net(nn.Module):
     def __init__(self):
         super(U_net, self).__init__()
@@ -16,11 +11,13 @@ class U_net(nn.Module):
         # output shape - (30, 256, 256)
         
         self.number_of_filters_input = 3
+        self.number_of_output_class = 30
         self.number_of_filters_level_0 = 64
         self.number_of_filters_level_1 = 128
         self.number_of_filters_level_2 = 256
         self.number_of_filters_level_3 = 512
         self.number_of_filters_level_4 = 1024
+        
         
         # Level 0
         
@@ -233,7 +230,7 @@ class U_net(nn.Module):
 
         return x_level_0_right
 
-def epoch_training(network, optimizer, criterion, train_set_loader, validation_set_loader):
+def epoch_training(network, optimizer, criterion, train_set_loader):
     network.train()
     for i, data in enumerate(train_set_loader, 0):
         inputs, labels = data
@@ -247,3 +244,32 @@ def epoch_training(network, optimizer, criterion, train_set_loader, validation_s
         loss.backward()
         optimizer.step()
     network.eval()
+    
+def training(network, train, validation, number_of_epochs=100):
+    train_input, train_output = train
+    validation_input, validation_output, validation_input_flipped, validation_output_flipped = validation
+    train_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(input_images, train_output), batch_size=5, shuffle=True)
+    validation_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(validation_input, validation_output, validation_input_flipped, validation_output_flipped), batch_size=1000, shuffle=False)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(network.parameters(), lr=0.0001, weight_decay=1e-2)
+    for epoch in range(number_of_epochs):
+        epoch_training(network, optimizer, criterion, train_set_loader)
+        print('Epoch ' + str(epoch) + ': Accuracy of the network:' + str(100*accuracy(network, validation_set_loader)) + '%')
+    print('Finished Training')
+
+def accuracy(network, validation_set_loader):
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data in validation_set_loader:
+            validation_input, validation_output, validation_input_flipped, validation_output_flipped = data
+            validation_input = validation_input.cuda()
+            validation_output = validation_output.cuda()
+            validation_input_flipped = validation_input_flipped.cuda()
+
+            outputs = network(validation_input)
+            outputs_flipped = network(validation_input_flipped)
+            _, predicted = torch.max((outputs.data+outputs_flipped[:,:,::-1,:])/2, 3)
+            total += labels.size(0)
+            correct += (predicted == validation_output).sum().item()
+    return correct/total
