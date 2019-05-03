@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.utils.data
 
 class U_net(nn.Module):
     def __init__(self):
@@ -205,25 +206,28 @@ class U_net(nn.Module):
         # level 4
         x_level_4 = F.relu(self.level_4_conv_0(x_level_4))
         x_level_4 = F.relu(self.level_4_conv_1(x_level_4))
-        x_level_4 = self.up_conv_level_4_to_level_3(x_level_4)
+        x_level_3_right = F.relu(self.up_conv_level_4_to_level_3(x_level_4))
         
         # level 3
-        x_level_3_right = torch.cat((x_level_3_left, x_level_4), 1)
+        x_level_3_right = torch.cat((x_level_3_left, x_level_3_right), 1)
         x_level_3_right = F.relu(self.level_3_conv_2(x_level_3_right))
         x_level_3_right = F.relu(self.level_3_conv_3(x_level_3_right))
+        x_level_2_right = F.relu(self.up_conv_level_3_to_level_2(x_level_3_right))
         
         # level 2
-        x_level_2_right = torch.cat((x_level_2_left, x_level_3_right), 1)
+        x_level_2_right = torch.cat((x_level_2_left, x_level_2_right), 1)
         x_level_2_right = F.relu(self.level_2_conv_2(x_level_2_right))
         x_level_2_right = F.relu(self.level_2_conv_3(x_level_2_right))
+        x_level_1_right = F.relu(self.up_conv_level_2_to_level_1(x_level_2_right))
         
         # level 1
-        x_level_1_right = torch.cat((x_level_1_left, x_level_2_right), 1)
+        x_level_1_right = torch.cat((x_level_1_left, x_level_1_right), 1)
         x_level_1_right = F.relu(self.level_1_conv_2(x_level_1_right))
         x_level_1_right = F.relu(self.level_1_conv_3(x_level_1_right))
+        x_level_0_right = F.relu(self.up_conv_level_1_to_level_0(x_level_1_right))
         
         # level 0
-        x_level_0_right = torch.cat((x_level_0_left, x_level_1_right), 1)
+        x_level_0_right = torch.cat((x_level_0_left, x_level_0_right), 1)
         x_level_0_right = F.relu(self.level_0_conv_2(x_level_0_right))
         x_level_0_right = F.relu(self.level_0_conv_3(x_level_0_right))
         x_level_0_right = F.relu(self.level_0_conv_4(x_level_0_right))
@@ -240,21 +244,23 @@ def epoch_training(network, optimizer, criterion, train_set_loader):
         optimizer.zero_grad()
 
         outputs = network(inputs)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, labels.long())
         loss.backward()
         optimizer.step()
     network.eval()
     
 def training(network, train, validation, number_of_epochs=100):
     train_input, train_output = train
-    validation_input, validation_output, validation_input_flipped, validation_output_flipped = validation
-    train_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(input_images, train_output), batch_size=5, shuffle=True)
-    validation_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(validation_input, validation_output, validation_input_flipped, validation_output_flipped), batch_size=1000, shuffle=False)
+    (validation_input, validation_input_flipped), (validation_output, validation_output_flipped) = validation
+    train_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.Tensor(train_input).transpose(1,3).contiguous(), torch.Tensor(train_output)), batch_size=5, shuffle=True)
+    validation_data_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.Tensor(validation_input).transpose(1,3).contiguous(), torch.Tensor(validation_output), torch.Tensor(validation_input_flipped).transpose(1,3).contiguous(), torch.Tensor(validation_output_flipped)), batch_size=50, shuffle=False)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(network.parameters(), lr=0.0001, weight_decay=1e-2)
+    print('Epoch ' + str(1) + ': Accuracy of the network:' + str(100*accuracy(network, validation_data_loader)) + '%')
     for epoch in range(number_of_epochs):
-        epoch_training(network, optimizer, criterion, train_set_loader)
-        print('Epoch ' + str(epoch) + ': Accuracy of the network:' + str(100*accuracy(network, validation_set_loader)) + '%')
+        print("Epoch " + str(epoch))
+        epoch_training(network, optimizer, criterion, train_data_loader)
+        print('Epoch ' + str(epoch) + ': Accuracy of the network:' + str(100*accuracy(network, validation_data_loader)) + '%')
     print('Finished Training')
 
 def accuracy(network, validation_set_loader):
@@ -269,7 +275,7 @@ def accuracy(network, validation_set_loader):
 
             outputs = network(validation_input)
             outputs_flipped = network(validation_input_flipped)
-            _, predicted = torch.max((outputs.data+outputs_flipped[:,:,::-1,:])/2, 3)
-            total += labels.size(0)
-            correct += (predicted == validation_output).sum().item()
+            _, predicted = torch.max(outputs.data+torch.flip(outputs_flipped, [2])/2, 1)
+            total += validation_input.view(-1).size(0)
+            correct += (predicted == validation_output.long()).sum().item()
     return correct/total
