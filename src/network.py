@@ -103,8 +103,10 @@ class U_net(nn.Module):
                                         bias=True) 
         
         # Level 4 -> Level 3
-        
-        self.up_conv_level_4_to_level_3 = up_conv()
+        self.up_conv_level_4_to_level_3 = nn.ConvTranspose2d(self.number_of_filters_level_4,
+                                                             self.number_of_filters_level_3,
+                                                             2,
+                                                             stride = 2)
         
         # Level 3
         
@@ -120,7 +122,10 @@ class U_net(nn.Module):
                                         bias=True)  
         # Level 3 -> Level 2
         
-        self.up_conv_level_3_to_level_2 = up_conv()
+        self.up_conv_level_3_to_level_2 = nn.ConvTranspose2d(self.number_of_filters_level_3,
+                                                             self.number_of_filters_level_2,
+                                                             2,
+                                                             stride = 2)
         
         # Level 2
         
@@ -136,7 +141,10 @@ class U_net(nn.Module):
                                         bias=True) 
         # Level 2 -> Level 1
             
-        self.up_conv_level_2_to_level_1 = up_conv()
+        self.up_conv_level_2_to_level_1 = nn.ConvTranspose2d(self.number_of_filters_level_2,
+                                                             self.number_of_filters_level_1,
+                                                             2,
+                                                             stride = 2)
         
         # Level 1
         
@@ -153,7 +161,10 @@ class U_net(nn.Module):
         
         # Level 1 -> Level 0
         
-        self.up_conv_level_1_to_level_0 = up_conv()
+        self.up_conv_level_1_to_level_0 = nn.ConvTranspose2d(self.number_of_filters_level_1,
+                                                             self.number_of_filters_level_0,
+                                                             2,
+                                                             stride = 2)
         
         # Level 0
         
