@@ -1,1 +1,1 @@
-{"RAW_DATA_PATH":"/datasets_GSN/cityscapes","PREPROCESSED_DATA_PATH":"data","DEVICE_NUMBER":0}
+{"RAW_DATA_PATH":"/datasets_GSN/cityscapes","PREPROCESSED_DATA_PATH":"data","DEVICE_NUMBER":0, "LOGS": "logs", "VALIDATION": "validation", "CHECKPOINTS": "checkpoints"}

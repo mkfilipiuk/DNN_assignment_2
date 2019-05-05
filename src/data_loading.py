@@ -5,7 +5,6 @@ import random
 import shutil
 
 from PIL import Image
-from sklearn.preprocessing import OneHotEncoder
 
 colours_list = [
      (116, 17, 36),
@@ -41,6 +40,7 @@ colours_list = [
 ]
 
 colours_dict = dict(zip(colours_list, range(len(colours_list))))
+id_to_colour_dict = dict(zip(range(len(colours_list)), colours_list))
 
 def load_config():
     with open('config.json', 'r') as f:
@@ -63,8 +63,6 @@ def img_array_to_single_val(arr, color_codes):
     return result
 
 def preprocess_data(config, validation_set_size = 0.1, test_set_size = 0.1):
-    ohe = OneHotEncoder(categories='auto', sparse=False, dtype=np.int32)
-    ohe.fit(img_array_to_single_val(load_image(os.path.join(config["RAW_DATA_PATH"],"0001.png"))[:,256:,:], colours_dict).reshape([-1,1]))
     number_of_pictures = len([name for name in os.listdir(config["RAW_DATA_PATH"]) if name.endswith(".png")])
     files = os.listdir(config["RAW_DATA_PATH"])
     random.shuffle(files)
@@ -72,7 +70,6 @@ def preprocess_data(config, validation_set_size = 0.1, test_set_size = 0.1):
         if filename.endswith(".png"): 
             img = load_image(os.path.join(config["RAW_DATA_PATH"],filename))
             img_coded = img_array_to_single_val(img[:,256:,:], colours_dict)
-            #img_ohe = ohe.transform(img_coded.reshape([-1,1])).reshape(256,256,30)
             if n < number_of_pictures*validation_set_size:
                 folder = "validation"
             elif n < number_of_pictures*(validation_set_size+test_set_size):
@@ -113,9 +110,6 @@ def aux_loading(config, folder, split_flips):
     else:
         return (np.stack(inputs, axis=0), np.stack(outputs, axis=0))
             
- 
-            
-            
 def load_train(config):
     return aux_loading(config, "train", split_flips=False)
 
@@ -124,8 +118,6 @@ def load_validation(config):
 
 def load_test(config):
     return aux_loading(config, "test", split_flips=True)
-
-            
                             
 def load_dataset(config, validation_set_size = 0.1, test_set_size = 0.1, force_preprocessing = False):
     if not os.path.exists(os.path.join(os.getcwd(),config["PREPROCESSED_DATA_PATH"])):
